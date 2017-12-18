@@ -1,0 +1,15 @@
+{
+  "name": "nodets",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "gen": "ts-node gen.ts",
+    "start": "ts-node test.ts"
+  },
+  "dependencies": {
+    "node-fetch": "^1.7.3",
+    "ts-node": "^4.0.1",
+    "typescript": "^2.7.0-dev.20171214"
+  }
+}
