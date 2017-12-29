@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "node-fetch": "^1.7.3",
-    "ts-node": "^4.0.1",
+    "ts-node": "^4.1.0",
     "typescript": "^2.7.0-dev.20171214"
   }
 }
