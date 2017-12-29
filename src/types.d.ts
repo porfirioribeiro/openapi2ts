@@ -1,4 +1,5 @@
 import { Options as PrettierOptions } from 'prettier';
+import {CompilerOptions} from 'typescript'
 
 // region Spec
 
@@ -107,14 +108,20 @@ export interface CodeGenOptions {
   outDir: string; // Directory to place code
   httpSchema?: 'https' | 'http';
   prettierOptions?: PrettierOptions;
+  //Generate JavaScript instead of TypeScript
+  genJS?:boolean;
+  tsCompilerOptions?: CompilerOptions; // Options to pass to TS compiler when converting TS to JS
+  // Defaults
   defaults: {
     consumes?: string; // Default consumes
     produces?: string; // Default produces
     security?: OperationSecurity; // Default security
   }; // Some defaults
+  //redux
   redux?: boolean; // Generate redux actions
   mangleActions?: boolean; // redux: mangle actions names to be smaller, useful in production
   actionTypePrefix?: string; // redux: prefix for actionType
+  //transforms
   transformSpec?: (options: ModuleOptions, spec: Spec) => string; // Transform the Spec
   transformOperation?: (options: ModuleOptions, spec: Operation) => string; // Transform the Spec
 }
