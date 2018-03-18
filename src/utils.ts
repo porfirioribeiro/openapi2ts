@@ -1,7 +1,5 @@
 import * as fs from 'fs-extra';
 import * as prettier from 'prettier';
-import * as ts from 'typescript';
-import * as _ from 'lodash';
 import { CodeGenOptions, OperationSecurity, SpecDefinitionType } from './types';
 
 export function typeFromRef(ref: string) {
@@ -33,26 +31,8 @@ export function transformSecurity(security?: OperationSecurity) {
   });
 }
 
-export const defaultCompilerOptions: ts.CompilerOptions = {
-  target: ts.ScriptTarget.Latest,
-  module: ts.ModuleKind.CommonJS,
-  lib: ['es2015'],
-  declaration: true,
-  declarationDir: '/tmp/xpto',
-};
-
 export function writeFile(options: CodeGenOptions, fileName: string, tsCode: string) {
-  if (options.genJS && !fileName.endsWith('.d.ts')) {
-    const gen = ts.transpileModule(tsCode, {
-      compilerOptions: _.merge(defaultCompilerOptions, options.tsCompilerOptions),
-      fileName,
-      reportDiagnostics: true,
-    });
-    return fs.outputFile(
-      fileName.replace(/\.ts$/, '.js'),
-      prettier.format(gen.outputText, options.prettierOptions),
-    );
-  }
+  if (!fileName.endsWith('.d.ts')) options._internal!.tsFiles.push(fileName);
   return fs.outputFile(
     fileName,
     prettier.format(tsCode, {
@@ -60,4 +40,13 @@ export function writeFile(options: CodeGenOptions, fileName: string, tsCode: str
       parser: 'typescript',
     }),
   );
+}
+
+const removeTpl = '// ^^^^^ Remove ^^^^^';
+export function loadTemplate(file: string) {
+  const request: string = fs.readFileSync(file) + '';
+
+  const index = request.indexOf(removeTpl);
+
+  return (index > -1 ? request.slice(index + removeTpl.length) : request) + '\n';
 }

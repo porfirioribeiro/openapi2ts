@@ -1,10 +1,17 @@
-export const apiMiddleware = (/*store*/) => (next: (action: any) => any) => (action: any) => {
-  if (!action.then && !action.$request) {
-    return next(action);
-  }
-  const { meta } = action.$request;
-  next({ type: action.$request.actionTypes[0] /*ACTION_START*/, meta });
-  return action.then((payload: any) =>
-    next({ type: action.$request.actionTypes[1] /*ACTION*/, meta, payload }),
+import { OpenApiAction } from './types';
+import { ResponsePromise } from './request';
+// ^^^^^ Remove ^^^^^
+
+type Dispatcher = (action: any) => any;
+type ActionType = ResponsePromise<any, any> | any;
+export const apiMiddleware = (/*store*/) => (next: Dispatcher) => (action: ActionType) => {
+  if (action.type !== OpenApiAction) return next(action);
+
+  const { meta, actionType } = action.request;
+  next({ type: `${actionType}_START` /*ACTION_START*/, meta, request: action.request });
+  return action.then(
+    (payload: any) => next({ type: actionType /*ACTION*/, meta, request: action.request, payload }),
+    (error: any) =>
+      next({ type: `${actionType}_ERROR` /*ACTION_ERROR*/, meta, request: action.request, error }),
   );
 };

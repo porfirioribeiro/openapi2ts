@@ -1,5 +1,5 @@
 import { Options as PrettierOptions } from 'prettier';
-import {CompilerOptions} from 'typescript'
+// import {CompilerOptions} from 'typescript'
 
 // region Spec
 
@@ -66,7 +66,7 @@ export interface SpecSchema {
   default: string;
 }
 
-interface StringMap {
+export interface StringMap {
   [k: string]: string;
 }
 
@@ -103,6 +103,10 @@ export type SpecDefinitionType =
 
 // endregion
 
+export interface InternalOptions {
+  tsFiles: string[]
+}
+
 export interface CodeGenOptions {
   schema: string | StringMap; // File or url to schema file
   outDir: string; // Directory to place code
@@ -110,20 +114,23 @@ export interface CodeGenOptions {
   prettierOptions?: PrettierOptions;
   //Generate JavaScript instead of TypeScript
   genJS?:boolean;
-  tsCompilerOptions?: CompilerOptions; // Options to pass to TS compiler when converting TS to JS
+  // tsCompilerOptions?: CompilerOptions; // Options to pass to TS compiler when converting TS to JS
   // Defaults
-  defaults: {
+  defaults?: {
     consumes?: string; // Default consumes
     produces?: string; // Default produces
     security?: OperationSecurity; // Default security
   }; // Some defaults
   //redux
   redux?: boolean; // Generate redux actions
+  reduxMiddleware?: boolean; // Generate redux middleware (defaults to true if redux is true)
+  reduxActionTypes?: boolean; //
   mangleActions?: boolean; // redux: mangle actions names to be smaller, useful in production
   actionTypePrefix?: string; // redux: prefix for actionType
   //transforms
   transformSpec?: (options: ModuleOptions, spec: Spec) => string; // Transform the Spec
   transformOperation?: (options: ModuleOptions, spec: Operation) => string; // Transform the Spec
+  _internal?: InternalOptions; //Internal
 }
 
 export interface ModuleOptions {

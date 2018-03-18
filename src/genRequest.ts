@@ -1,8 +1,6 @@
-import * as fs from 'fs-extra';
 import * as path from 'path';
 import { CodeGenOptions, ModuleOptions, Spec } from './types';
 import * as utils from './utils';
-
 /**
  *
  * @param {ModuleOptions[]} modules
@@ -10,7 +8,7 @@ import * as utils from './utils';
  * @param {CodeGenOptions} options
  */
 async function genRequest(modules: ModuleOptions[], specs: Spec[], options: CodeGenOptions) {
-  const typesTemplate = await fs.readFile(path.resolve(__dirname, '../template/types.ts'));
+  const typesTemplate = utils.loadTemplate(path.resolve(__dirname, '../template/types.ts'));
 
   const httpSchema = options.httpSchema || (specs[0].schemes ? specs[0].schemes[0] : 'https');
   let code = `${utils.fileHeader(options)}
@@ -28,21 +26,13 @@ let options: ReqOptions = {
     },
     defaults: ${JSON.stringify({
       ...options.defaults,
-      security: utils.transformSecurity(options.defaults.security),
-    })}
-};
-`;
-  // await fs.outputFile(options.outDir+'/spec.js',code+'\n};');
-  // await fs.copy(path.resolve(__dirname,'./template/request.ts'), options.outDir+'/index.js')
-  const request: string =
-    (await fs.readFile(path.resolve(__dirname, '../template/request.ts'))) + '';
+      security: utils.transformSecurity(options.defaults && options.defaults.security),
+    })},
+`; //This object will be close on the request.ts template
+  code += utils.loadTemplate(path.resolve(__dirname, '../template/request.ts'));
 
-  const removeTpl = '// ^^^^^ Remove ^^^^^';
-  const index = request.indexOf(removeTpl) + removeTpl.length;
-
-  code += request.slice(index) + '\n';
-  if (options.redux) {
-    code += (await fs.readFile(path.resolve(__dirname, '../template/reduxMiddleware.ts'))) + '\n';
+  if (options.redux && options.reduxMiddleware !== false) {
+    code += utils.loadTemplate(path.resolve(__dirname, '../template/reduxMiddleware.ts'));
   }
   await utils.writeFile(options, `${options.outDir}/index.ts`, code);
   // await fs.outputFile('/index.js', code + template);

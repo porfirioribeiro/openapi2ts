@@ -46,7 +46,11 @@ async function genOperations(module: ModuleOptions, spec: Spec) {
         allOps[tag] = { [op.operationId]: op };
       } else if (allOps[tag][op.operationId]) {
         const operationId =
-          op.operationId + path.split('/').pop()!.replace(/^\w/, l => l.toUpperCase());
+          op.operationId +
+          path
+            .split('/')
+            .pop()!
+            .replace(/^\w/, l => l.toUpperCase());
         console.warn(
           `'${op.operationId}' operationId is duplicated in '${
             module.name
@@ -59,7 +63,8 @@ async function genOperations(module: ModuleOptions, spec: Spec) {
       if (!Array.isArray(code[tag])) {
         code[tag] = [
           `${utils.fileHeader(module.options)}
-           import { request, ResponsePromise } from '${basePath}';
+           import { ResponsePromise } from '${basePath}index';
+           import { request } from '${basePath}';
            import * as types from "./types";
            `,
         ];
@@ -82,8 +87,17 @@ async function genOperations(module: ModuleOptions, spec: Spec) {
       );
 
       addOtherParams(module, op, params);
-      const optionsType = getOptionsType(params);
-      const requestArgs = optionsType.length ? [`options: {${optionsType.join(', ')}}`] : [];
+      const optionsTypes = getOptionsType(params);
+      let optionsType = `any`;
+
+      let requestArgs: string[] = [];
+      if (optionsTypes.length) {
+        optionsType = `${_.upperFirst(op.operationId)}Options`;
+        requestArgs = [`options: ${optionsType}`];
+        code[tag].push(`\nexport interface ${optionsType} {${optionsTypes.join(', ')}}\n`);
+        params.other.push({ name: 'options' });
+      }
+
       const docResponse = getDocResponse(module, op);
 
       if (redux) {
@@ -93,10 +107,11 @@ async function genOperations(module: ModuleOptions, spec: Spec) {
           : `api${modulePath}/${tag}/${op.operationId}`;
         requestArgs.push('meta?: any');
         params.other.push({ name: 'meta' });
-        params.other.push({ name: 'actionTypes', value: `[${actionType}_START, ${actionType}]` });
+        params.other.push({ name: 'actionType', value: actionType });
         code[tag].push(`
 export const ${actionType} = '${actionString}';
 export const ${actionType}_START = '${actionString}/START';
+export const ${actionType}_ERROR = '${actionString}/ERROR';
                 `);
       }
 
@@ -105,7 +120,9 @@ export const ${actionType}_START = '${actionString}/START';
 /**
  * ${docs.join('\n * ')}
  */
-export const ${op.operationId} = (${requestArgs.join(', ')}): ResponsePromise<${docResponse}> => 
+export const ${op.operationId} = (${requestArgs.join(
+        ', ',
+      )}): ResponsePromise<${docResponse}, ${optionsType}> => 
     request({
         ${module.name && `module: '${module.name}',\n\t\t`}method: '${method.toUpperCase()}',
         uri: '${path}',
@@ -144,9 +161,9 @@ function genParams(params: Params) {
         acc.concat([
           iN === 'body'
             ? 'body: options.body'
-            : `${iN}: {${params[iN as keyof Params]!
-                .map(p => `${p.name}: options.${p.name}`)
-                .join(', ')}}`,
+            : `${iN}: {${params[iN as keyof Params]!.map(p => `${p.name}: options.${p.name}`).join(
+                ', ',
+              )}}`,
         ]),
       [],
     )
@@ -162,19 +179,22 @@ function genParams(params: Params) {
 // }
 
 function addOtherParams(module: ModuleOptions, op: Operation, params: Params) {
-  if (!_.isEqual(op.security, module.options.defaults.security)) {
+  if (
+    op.security &&
+    !(module.options.defaults && _.isEqual(op.security, module.options.defaults.security))
+  ) {
     params.other.push({
       name: 'security',
       value: JSON.stringify(op.security ? utils.transformSecurity(op.security) : null),
     });
   }
-  if (op.consumes && !module.options.defaults.consumes) {
+  if (op.consumes && !(module.options.defaults && module.options.defaults.consumes)) {
     params.other.push({
       name: 'consumes',
       value: JSON.stringify(op.consumes),
     });
   }
-  if (op.produces && !module.options.defaults.produces) {
+  if (op.produces && !(module.options.defaults && module.options.defaults.produces)) {
     params.other.push({
       name: 'produces',
       value: JSON.stringify(op.produces),

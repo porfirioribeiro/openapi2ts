@@ -1,7 +1,10 @@
-import { ReqOptions, RequestParams } from './types';
+import { ApiResponse, ReqOptions, RequestParams, OpenApiAction } from './types';
 
-let options: ReqOptions;
-// ^^^^^ Remove ^^^^^
+let options: ReqOptions = {
+  modules: {},
+  defaults: {},
+  // ^^^^^ Remove ^^^^^
+};
 
 type InitializeFn = (options: ReqOptions) => Partial<ReqOptions>;
 
@@ -10,20 +13,25 @@ export const initialize = (newOptions?: Partial<ReqOptions> | InitializeFn) => {
   if (newOptions)
     options = {
       ...options,
-      ...typeof newOptions === 'function' ? newOptions(options) : newOptions,
+      ...(typeof newOptions === 'function' ? newOptions(options) : newOptions),
     };
 };
 
 /** Return a copy of the options object */
 export const getOptions = (): ReqOptions => ({ ...options });
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+export interface ResponsePromise<TResponseData, TRequestOptions>
+  extends PromiseLike<ApiResponse<TResponseData, TRequestOptions>> {
+  type: typeof OpenApiAction;
+  promise: Promise<ApiResponse<TResponseData, TRequestOptions>>;
+  request: RequestParams<TRequestOptions>;
+}
 
-export type ResponsePromise<T> = Promise<T> & { $request: any };
-
-export const request = <T>(req: RequestParams): ResponsePromise<T> => {
-    let moduleName = req.module || 'default';
-    const mod = options.modules[moduleName];
+export const request = <TResponseData, TRequestOptions>(
+  req: RequestParams<TRequestOptions>,
+): ResponsePromise<TResponseData, TRequestOptions> => {
+  req.module = req.module || 'default';
+  const mod = options.modules[req.module];
   let resolveParams = Promise.resolve(req);
   const security = req.security !== null ? req.security || options.defaults.security : undefined;
   if (
@@ -33,25 +41,28 @@ export const request = <T>(req: RequestParams): ResponsePromise<T> => {
   ) {
     resolveParams = security.reduce(
       (promise, sec) =>
-        promise.then(newReq => options.applyAuth!(newReq, sec, mod.security[sec.id], moduleName)),
+        promise.then(newReq => options.applyAuth!(newReq, sec, mod.security[sec.id])) as Promise<
+          RequestParams<TRequestOptions>
+        >,
       resolveParams,
     );
   }
-  const r: ResponsePromise<T> = resolveParams.then(params => {
+  const promise: Promise<ApiResponse<TResponseData, TRequestOptions>> = resolveParams.then(p => {
+    const params = options.processRequest ? options.processRequest(p) : p;
+
     let url = mod.url + req.uri;
     if (params.path) {
       url = Object.keys(params.path).reduce((u, p) => u.replace(`{${p}}`, params.path![p]), url);
     }
     if (params.query) {
-      url +=
-        '?' +
-        Object.keys(params.query)
-          .map(q => `${q}=${params.query![q]}`)
-          .join('&');
+      url += `?${Object.keys(params.query)
+        .map(q => `${q}=${params.query![q]}`)
+        .join('&')}`;
     }
 
-    const produces = req.produces || options.defaults.produces;
-    const consumes = req.consumes || options.defaults.consumes;
+    const produces = options.defaults.produces ? [options.defaults.produces] : req.produces;
+    const consumes = options.defaults.consumes ? [options.defaults.consumes] : req.consumes;
+    console.log('produces', produces);
     const fetchOptions: RequestInit = {
       method: req.method,
       headers: {
@@ -62,27 +73,33 @@ export const request = <T>(req: RequestParams): ResponsePromise<T> => {
       body: params.body ? JSON.stringify(params.body) : undefined,
     };
 
-    return fetch(url, fetchOptions).then((res: Response) => {
-      // const format = response.ok ? formatResponse : formatServiceError;;
-      const contentType = res.headers.get('content-type') || '';
-
-      let parse;
-      if (res.status === 204) {
-        parse = Promise.resolve();
-      } else if (contentType.indexOf('json')) {
-        parse = res.json();
-      } else if (contentType.indexOf('octet-stream')) {
-        parse = res.blob();
-      } else if (contentType.indexOf('text')) {
-        parse = res.text();
-      } else {
-        parse = Promise.resolve();
-      }
-      return parse;
-    });
+    return fetch(url, fetchOptions).then(parseResponse.bind(null, req));
   }) as any;
-  r.$request = req;
-  return r;
+  return {
+    type: OpenApiAction,
+    promise,
+    request: req,
+    then: (th, ca) => promise.then(th, ca),
+  };
 };
+
+function parseResponse(request: RequestParams<any>, res: Response) {
+  // const format = response.ok ? parseResponse : formatServiceError;;
+  const contentType = res.headers.get('content-type') || '';
+
+  let parse: Promise<any> = Promise.resolve();
+  if (res.status !== 204) {
+    if (contentType.indexOf('json') > -1) parse = res.json();
+    else if (contentType.indexOf('octet-stream') > -1) parse = res.blob();
+    else if (contentType.indexOf('text') > -1) parse = res.text();
+  }
+
+  return parse.then(data => {
+    console.log('parse', contentType, data);
+    const parsed = { raw: res, data, request };
+    if (options.formatResponse) return options.formatResponse(parsed);
+    return parsed;
+  });
+}
 
 export default initialize;
