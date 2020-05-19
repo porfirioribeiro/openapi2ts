@@ -1,4 +1,5 @@
 lib
+dist
 sample/gen
 sample/**/api
 sample/**/dist

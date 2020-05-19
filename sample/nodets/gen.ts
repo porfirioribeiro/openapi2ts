@@ -1,4 +1,4 @@
-const codeGen = require('../../lib/index');
+const codeGen = require('../..');
 const path = require('path');
 
 

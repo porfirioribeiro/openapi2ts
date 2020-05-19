@@ -8,8 +8,8 @@
     "start": "nodemon -e js --watch '*.js' --watch 'gen' test.js"
   },
   "dependencies": {
-    "node-fetch": "^1.7.3",
-    "nodemon": "^1.14.3",
-    "typescript": "^2.7.0-dev.20171214"
+    "node-fetch": "^2.6.0",
+    "nodemon": "^2.0.4",
+    "typescript": "^3.9.2"
   }
 }
